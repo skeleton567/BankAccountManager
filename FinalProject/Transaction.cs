@@ -120,17 +120,11 @@ namespace FinalProject
                 decimal usdChange;
                 decimal eurChange;
 
-                if (previousTransaction != null && transaction.TransactionType == "Deposit")
+                if (previousTransaction != null && (transaction.TransactionType == "Deposit" || transaction.TransactionType == "Withdraw"))
                 {
                     gelChange = previousTransaction.Amount - transaction.Amount;
                     usdChange = previousTransaction.AmountUSD - transaction.AmountUSD;
                     eurChange = previousTransaction.AmountEUR - transaction.AmountEUR;
-                }
-                else if (previousTransaction != null && transaction.TransactionType == "Withdraw")
-                {
-                    gelChange =  previousTransaction.Amount - transaction.Amount;
-                    usdChange =  previousTransaction.AmountUSD - transaction.AmountUSD;
-                    eurChange =  previousTransaction.AmountEUR - transaction.AmountUSD;
                 }
                 else
                 {
