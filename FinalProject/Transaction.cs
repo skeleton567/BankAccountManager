@@ -9,11 +9,15 @@ using Microsoft.VisualBasic;
 
 namespace FinalProject
 {
+    public delegate void TransactionDelegate(string mesage);
+
     static class Transaction
     {
         public static readonly decimal EURConversion = 2.85m;
 
         public static readonly decimal USDConversion = 2.6m;
+
+        public static event TransactionDelegate OnTransaction;
 
         public static void CheckDeposit(User newUser)
         {
@@ -24,6 +28,8 @@ namespace FinalProject
             Console.WriteLine($"Your current balance is: {user.TransactionHistories.Last().AmountUSD} USD");
 
             Console.WriteLine($"Your current balance is: {user.TransactionHistories.Last().AmountEUR} EUR");
+
+            TriggerTransactionEvent("User checked their balance.");
         }
 
         public static void Withdraw(User newUser)
@@ -60,6 +66,8 @@ namespace FinalProject
             Console.WriteLine($"New balance is: {newBalance} GEL");
             Console.WriteLine($"New balance is: {newBalanceUSD} USD");
             Console.WriteLine($"New balance is: {newBalanceEUR} EUR");
+
+            TriggerTransactionEvent($"User withdrawn {amount}");
         }
 
         public static void Deposit(User newUser, string argumentAmount)
@@ -91,6 +99,8 @@ namespace FinalProject
             Console.WriteLine($"New balance is: {newBalance} GEL");
             Console.WriteLine($"New balance is: {newBalanceUSD} USD");
             Console.WriteLine($"New balance is: {newBalanceEUR} EUR");
+
+            TriggerTransactionEvent($"User deposited {amount}");
         }
 
         public static void getLastFiveTransactions(User newUser)
@@ -135,6 +145,8 @@ namespace FinalProject
 
                 Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} of {Math.Abs(gelChange)} GEL ({Math.Abs(usdChange)} USD, {Math.Abs(eurChange)} EUR)");
             }
+
+            TriggerTransactionEvent($"User checked last 5 transactions");
         }
 
         public static void ChangePin(User newUser)
@@ -157,6 +169,8 @@ namespace FinalProject
             user.Pin = newPin;
             SaveNewUser(user);
             Console.WriteLine("PIN successfully changed.");
+
+            TriggerTransactionEvent($"User changed pin");
         }
 
         public static void MoneyConversion(User newUser)
@@ -186,6 +200,8 @@ namespace FinalProject
                     Console.WriteLine("Invalid choice.");
                     break;
             }
+
+            TriggerTransactionEvent($"User converted money");
         }
 
         public static User FindOrCreateUserJson(User newUser)
@@ -220,6 +236,17 @@ namespace FinalProject
             var user = JsonSerializer.Deserialize<User>(jsonString);
 
             return user!;
+        }
+
+        public static void TriggerTransactionEvent(string message)
+        {
+            OnTransaction?.Invoke(message);
+        }
+
+        public static void ListenToEvents()
+        {
+            var logger = new Logger();
+            OnTransaction += logger.Log;
         }
     }
 }

@@ -5,7 +5,7 @@ Console.WriteLine("Enter Card details:");
     Console.Write("Card Number: ");
     var cardNumber = Console.ReadLine() ?? string.Empty;
 
-    if (cardNumber.Length != 1 || !long.TryParse(cardNumber, out _))
+    if (cardNumber.Length != 16 || !long.TryParse(cardNumber, out _))
     {
         Console.WriteLine("Invalid card number. It must be 16 digits.");
         return;
@@ -49,6 +49,7 @@ while (true)
 
     newUser.Pin = pin;
 
+    Transaction.ListenToEvents();
     Transaction.FindOrCreateUserJson(newUser);
 
     Console.WriteLine("You loged in succesfully. Please choose and action:");

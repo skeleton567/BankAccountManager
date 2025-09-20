@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FinalProject
 {
-    class TransactionHistory
+    public class TransactionHistory
     {
         public DateTime TransactionDate { get; set; } = DateTime.Now;
         public string TransactionType { get; set; } = "Initial Deposit";

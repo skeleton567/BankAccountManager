@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace FinalProject
 {
-     class User
+     public class User
     {
         public string CardNumber { get; set; } = "1234567890123456";
         public string Cvv { get; set; } = "123";
