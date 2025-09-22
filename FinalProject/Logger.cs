@@ -8,12 +8,16 @@ namespace FinalProject
 {
      class Logger
     {
-        public readonly string LogFilePath = "transaction_log.txt";
+        public readonly string TransactionFilePath = "transaction_log.txt";
 
-        public void Log(string message)
+        public readonly string ErrorFilePath = "error_log.txt";
+
+        public void Log(string message, string type = "transaction")
         {
             var logMessage = $"{DateTime.Now}: {message}{Environment.NewLine}";
-            File.AppendAllText(LogFilePath, logMessage);
+            var logFilePath = type.ToLower() == "error" ? ErrorFilePath : TransactionFilePath;
+            File.AppendAllText(logFilePath, logMessage);
         }
+
     }
 }

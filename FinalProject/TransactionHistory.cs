@@ -11,7 +11,7 @@ namespace FinalProject
         public DateTime TransactionDate { get; set; } = DateTime.Now;
         public string TransactionType { get; set; } = "Initial Deposit";
         public decimal Amount { get; set; } = 100; 
-        public decimal AmountUSD { get; set; } = 100 / Transaction.USDConversion;
-        public decimal AmountEUR { get; set; } = 100 / Transaction.EURConversion;
+        public decimal AmountUSD { get; set; } = 0;
+        public decimal AmountEUR { get; set; } = 0;
     }
 }

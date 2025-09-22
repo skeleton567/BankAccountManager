@@ -9,7 +9,7 @@ using Microsoft.VisualBasic;
 
 namespace FinalProject
 {
-    public delegate void TransactionDelegate(string mesage);
+    public delegate void TransactionDelegate(string mesage, string type = "transaction");
 
     static class Transaction
     {
@@ -50,24 +50,21 @@ namespace FinalProject
                 return;
             }
             var newBalance = lastTransaction.Amount - amount;
-            var newBalanceUSD = lastTransaction.AmountUSD - amount / USDConversion;
-            var newBalanceEUR = lastTransaction.AmountEUR - amount / EURConversion;
+
             var newTransaction = new TransactionHistory
             {
                 TransactionDate = DateTime.Now,
                 Amount = newBalance,
-                AmountUSD = newBalanceUSD,
-                AmountEUR = newBalanceEUR,
+                AmountUSD = lastTransaction.AmountUSD,
+                AmountEUR = lastTransaction.AmountEUR,
                 TransactionType = "Withdraw"
             };
             user.TransactionHistories.Add(newTransaction);
             SaveNewUser(user);
             Console.WriteLine($"Successfully withdrew {amount} GEL.");
             Console.WriteLine($"New balance is: {newBalance} GEL");
-            Console.WriteLine($"New balance is: {newBalanceUSD} USD");
-            Console.WriteLine($"New balance is: {newBalanceEUR} EUR");
 
-            TriggerTransactionEvent($"User withdrawn {amount}");
+            TriggerTransactionEvent($"User withdrawn {amount}. New balance is: {newBalance} GEL");
         }
 
         public static void Deposit(User newUser, string argumentAmount)
@@ -83,24 +80,21 @@ namespace FinalProject
             var user = FindOrCreateUserJson(newUser);
             var lastTransaction = user.TransactionHistories.Last();
             var newBalance = lastTransaction.Amount + amount;
-            var newBalanceUSD = lastTransaction.AmountUSD + amount / USDConversion;
-            var newBalanceEUR = lastTransaction.AmountEUR + amount / EURConversion;
+
             var newTransaction = new TransactionHistory
             {
                 TransactionDate = DateTime.Now,
                 Amount = newBalance,
-                AmountUSD = newBalanceUSD,
-                AmountEUR = newBalanceEUR,
+                AmountUSD = lastTransaction.AmountUSD,
+                AmountEUR = lastTransaction.AmountEUR,
                 TransactionType = "Deposit"
             };
             user.TransactionHistories.Add(newTransaction);
             SaveNewUser(user);
             Console.WriteLine($"Successfully deposited {amount} GEL.");
             Console.WriteLine($"New balance is: {newBalance} GEL");
-            Console.WriteLine($"New balance is: {newBalanceUSD} USD");
-            Console.WriteLine($"New balance is: {newBalanceEUR} EUR");
 
-            TriggerTransactionEvent($"User deposited {amount}");
+            TriggerTransactionEvent($"User deposited {amount}. New balance is: {newBalance} GEL");
         }
 
         public static void getLastFiveTransactions(User newUser)
@@ -126,24 +120,34 @@ namespace FinalProject
           
                 var previousTransaction = lastSixTransactions.ElementAtOrDefault(i + 1);
 
+                if(transaction.TransactionType.Contains("Conversion") && previousTransaction != null)
+                {
+                   
+                    var prevGEL = previousTransaction.Amount;
+                    var currGEL = transaction.Amount;
+                    var gelChangeConv = prevGEL - currGEL;
+
+                    var otherCurrencyAmount = transaction.TransactionType.Contains("USD") ? transaction.AmountUSD : transaction.AmountEUR;
+                    var prevOtherCurrencyAmount = previousTransaction.TransactionType.Contains("USD") ? previousTransaction.AmountUSD : previousTransaction.AmountEUR;
+                    var otherCurrencyChange = otherCurrencyAmount - prevOtherCurrencyAmount;
+
+                    Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} {gelChangeConv} GEL converted to {otherCurrencyChange}");
+                    continue;
+                }
+
                 decimal gelChange;
-                decimal usdChange;
-                decimal eurChange;
 
                 if (previousTransaction != null && (transaction.TransactionType == "Deposit" || transaction.TransactionType == "Withdraw"))
                 {
                     gelChange = previousTransaction.Amount - transaction.Amount;
-                    usdChange = previousTransaction.AmountUSD - transaction.AmountUSD;
-                    eurChange = previousTransaction.AmountEUR - transaction.AmountEUR;
+    
                 }
                 else
                 {
                     gelChange = transaction.Amount;
-                    usdChange = transaction.AmountUSD;
-                    eurChange = transaction.AmountEUR;
                 }
 
-                Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} of {Math.Abs(gelChange)} GEL ({Math.Abs(usdChange)} USD, {Math.Abs(eurChange)} EUR)");
+                Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} of {Math.Abs(gelChange)} GEL");
             }
 
             TriggerTransactionEvent($"User checked last 5 transactions");
@@ -185,16 +189,10 @@ namespace FinalProject
             switch (choice)
             {
                 case "1":
-                    Console.Write("Enter amount in GEL to convert: ");
-                    var inputUSD = Console.ReadLine() ?? string.Empty;
-                    var amountUSD = decimal.TryParse(inputUSD, out decimal parsedAmount) ? parsedAmount : 0;
-                    Console.WriteLine($"Here is your money in USD: {amountUSD / USDConversion} USD");
+                    convertAmount(newUser, "USD");
                     break;
                 case "2":
-                    Console.Write("Enter amount in GEL to convert: ");
-                    var inputEUR = Console.ReadLine() ?? string.Empty;
-                    var amountEUR = decimal.TryParse(inputEUR, out decimal parsedAmountEUR) ? parsedAmountEUR : 0;
-                    Console.WriteLine($"Here is your money in USD: {amountEUR / EURConversion} EUR");
+                    convertAmount(newUser, "EUR");
                     break;
                 default:
                     Console.WriteLine("Invalid choice.");
@@ -224,8 +222,8 @@ namespace FinalProject
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.Message);
-                return new User();
+                TriggerTransactionEvent(e.Message, "error");
+                return SaveNewUser(newUser);
             }
         }
 
@@ -238,9 +236,49 @@ namespace FinalProject
             return user!;
         }
 
-        public static void TriggerTransactionEvent(string message)
+        private static void convertAmount(User newUser ,string currency = "USD")
         {
-            OnTransaction?.Invoke(message);
+            Console.Write("Enter amount in GEL to convert: ");
+            var input = Console.ReadLine() ?? string.Empty;
+            var amount = decimal.TryParse(input, out decimal parsedAmount) ? parsedAmount : 0;
+            var lastTransaction = newUser.TransactionHistories.Last();
+
+            if (amount <= 0)
+            {
+                Console.WriteLine("Invalid amount. Please enter a positive number.");
+                return;
+            }
+
+            if (amount > lastTransaction.Amount)
+            {
+                Console.WriteLine("Not enought funds");
+                return;
+            }
+
+            var rate = currency.ToUpper() == "EUR" ? EURConversion : USDConversion;
+            var quantity = amount / rate;
+            Console.WriteLine($"Succesfully converted in {currency}: {quantity} {currency}");
+
+
+            var newTransaction = new TransactionHistory
+            {
+                TransactionDate = DateTime.Now,
+                Amount = lastTransaction.Amount - amount,
+                AmountUSD = currency == "USD"  ?lastTransaction.AmountUSD + quantity : lastTransaction.AmountUSD,
+                AmountEUR = currency == "EUR" ? lastTransaction.AmountEUR + quantity : lastTransaction.AmountEUR,
+                TransactionType = $"Conversion to {currency}"
+            };
+
+            newUser.TransactionHistories.Add(newTransaction);
+
+            SaveNewUser(newUser);
+
+            TriggerTransactionEvent($"User converted {amount} GEL to {currency}");
+        }
+
+        public static void TriggerTransactionEvent(string message, string type = "transaction")
+        {
+            OnTransaction?.Invoke(message, type);
         }
 
         public static void ListenToEvents()
