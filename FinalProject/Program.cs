@@ -8,7 +8,7 @@ try
     Console.Write("Card Number: ");
     var cardNumber = Console.ReadLine() ?? string.Empty;
 
-    if (cardNumber.Length != 1 || !long.TryParse(cardNumber, out _))
+    if (cardNumber.Length != 16 || !long.TryParse(cardNumber, out _))
     {
         Console.WriteLine("Invalid card number. It must be 16 digits.");
         return;
