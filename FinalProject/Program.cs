@@ -63,7 +63,8 @@ try
         Console.WriteLine("4. Get Last 5 transactions");
         Console.WriteLine("5. Change pin");
         Console.WriteLine("6. Money conversion");
-        Console.Write("Select an option (1-6): ");
+        Console.WriteLine("7. Exit");
+        Console.Write("Select an option (1-7): ");
 
         var choice = Console.ReadLine() ?? string.Empty;
 
@@ -87,8 +88,11 @@ try
             case "6":
                await Transaction.MoneyConversionAsync(newUser);
                 break;
+            case "7":
+                Console.WriteLine("Exiting the application. Goodbye!");
+                return;
             default:
-                Console.WriteLine("Invalid option. Please select a number between 1 and 6.");
+                Console.WriteLine("Invalid option. Please select a number between 1 and 7.");
                 break;
         }
     }
