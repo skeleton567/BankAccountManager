@@ -8,7 +8,7 @@ try
     Console.Write("Card Number: ");
     var cardNumber = Console.ReadLine() ?? string.Empty;
 
-    if (cardNumber.Length != 16 || !long.TryParse(cardNumber, out _))
+    if (cardNumber.Length != 1 || !long.TryParse(cardNumber, out _))
     {
         Console.WriteLine("Invalid card number. It must be 16 digits.");
         return;
@@ -34,11 +34,11 @@ try
 
     var newUser = new User() { CardNumber = cardNumber, Cvv = cvv, ExpirationDate = expDate };
 
-    Transaction.SaveNewUser(newUser);
+    await Transaction.SaveNewUserAsync(newUser);
 
     while (true)
     {
-        var user = Transaction.FindOrCreateUserJson(newUser);
+        var user = await Transaction.FindOrCreateUserJsonAsync(newUser);
         Console.WriteLine("Please enter your 4-digit PIN to log in:");
         Console.Write("PIN: ");
         var pin = Console.ReadLine() ?? string.Empty;
@@ -53,7 +53,7 @@ try
         newUser.Pin = pin;
 
         Transaction.ListenToEvents();
-        Transaction.FindOrCreateUserJson(newUser);
+        await Transaction.FindOrCreateUserJsonAsync(newUser);
 
         Console.WriteLine("You loged in succesfully. Please choose and action:");
 
@@ -70,24 +70,22 @@ try
         switch (choice)
         {
             case "1":
-                Transaction.CheckDeposit(newUser);
+               await Transaction.CheckDepositAsync(newUser);
                 break;
             case "2":
-                Transaction.Withdraw(newUser);
+               await Transaction.WithdrawAsync(newUser);
                 break;
             case "3":
-                Console.Write("Enter amount to deposit: ");
-                var amount = Console.ReadLine() ?? string.Empty;
-                Transaction.Deposit(newUser, amount);
+                await Transaction.DepositAsync(newUser);
                 break;
             case "4":
-                Transaction.getLastFiveTransactions(newUser);
+               await Transaction.GetLastFiveTransactionsAsync(newUser);
                 break;
             case "5":
-                Transaction.ChangePin(newUser);
+                await Transaction.ChangePinAsync(newUser);
                 break;
             case "6":
-                Transaction.MoneyConversion(newUser);
+               await Transaction.MoneyConversionAsync(newUser);
                 break;
             default:
                 Console.WriteLine("Invalid option. Please select a number between 1 and 6.");
@@ -99,5 +97,5 @@ try
 catch (Exception ex)
 {
     var logger = new Logger();
-    logger.Log(ex.Message, "error");
+   await logger.LogAsync(ex.Message, "error");
 }

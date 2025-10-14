@@ -12,11 +12,11 @@ namespace FinalProject
 
         public readonly string ErrorFilePath = "error_log.txt";
 
-        public void Log(string message, string type = "transaction")
+        public async Task LogAsync(string message, string type = "transaction")
         {
             var logMessage = $"{DateTime.Now}: {message}{Environment.NewLine}";
             var logFilePath = type.ToLower() == "error" ? ErrorFilePath : TransactionFilePath;
-            File.AppendAllText(logFilePath, logMessage);
+           await File.AppendAllTextAsync(logFilePath, logMessage);
         }
 
     }

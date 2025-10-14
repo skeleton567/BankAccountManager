@@ -1,44 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using System.Transactions;
-using Microsoft.VisualBasic;
 
 namespace FinalProject
 {
-    public delegate void TransactionDelegate(string mesage, string type = "transaction");
+    public delegate Task TransactionDelegate(string message, string type = "transaction");
 
     static class Transaction
     {
         public static readonly decimal EURConversion = 2.85m;
-
         public static readonly decimal USDConversion = 2.6m;
 
-        public static event TransactionDelegate OnTransaction;
+        public static event TransactionDelegate? OnTransaction;
 
-        public static void CheckDeposit(User newUser)
+        public static async Task CheckDepositAsync(User newUser)
         {
-            var user = FindOrCreateUserJson(newUser);
+            var user = await FindOrCreateUserJsonAsync(newUser);
 
-            Console.WriteLine($"Your current balance is: {user.TransactionHistories.Last().Amount} GEl");
-
+            Console.WriteLine($"Your current balance is: {user.TransactionHistories.Last().Amount} GEL");
             Console.WriteLine($"Your current balance is: {user.TransactionHistories.Last().AmountUSD} USD");
-
             Console.WriteLine($"Your current balance is: {user.TransactionHistories.Last().AmountEUR} EUR");
 
-            TriggerTransactionEvent("User checked their balance.");
+            await TriggerTransactionEventAsync("User checked their balance.");
         }
 
-        public static void Withdraw(User newUser)
+        public static async Task WithdrawAsync(User newUser)
         {
-            var user = FindOrCreateUserJson(newUser);
+            var user = await FindOrCreateUserJsonAsync(newUser);
             var lastTransaction = user.TransactionHistories.Last();
+
             Console.Write("Enter amount to withdraw: ");
             var input = Console.ReadLine() ?? string.Empty;
-            var amount = decimal.TryParse(input, out decimal parsedAmount) ? parsedAmount : 0;
+            var amount = decimal.TryParse(input, out var parsedAmount) ? parsedAmount : 0;
+
             if (amount <= 0)
             {
                 Console.WriteLine("Invalid amount. Please enter a positive number.");
@@ -49,6 +46,7 @@ namespace FinalProject
                 Console.WriteLine("Insufficient funds.");
                 return;
             }
+
             var newBalance = lastTransaction.Amount - amount;
 
             var newTransaction = new TransactionHistory
@@ -59,25 +57,29 @@ namespace FinalProject
                 AmountEUR = lastTransaction.AmountEUR,
                 TransactionType = "Withdraw"
             };
+
             user.TransactionHistories.Add(newTransaction);
-            SaveNewUser(user);
+            await SaveNewUserAsync(user);
+
             Console.WriteLine($"Successfully withdrew {amount} GEL.");
             Console.WriteLine($"New balance is: {newBalance} GEL");
 
-            TriggerTransactionEvent($"User withdrawn {amount}. New balance is: {newBalance} GEL");
+            await TriggerTransactionEventAsync($"User withdrew {amount}. New balance is: {newBalance} GEL");
         }
 
-        public static void Deposit(User newUser, string argumentAmount)
+        public static async Task DepositAsync(User newUser)
         {
-            var amount = decimal.TryParse(argumentAmount, out decimal parsedAmount) ? parsedAmount : 0;
+            Console.Write("Enter amount to deposit: ");
+            var amountInput = Console.ReadLine() ?? string.Empty;
 
+            var amount = decimal.TryParse(amountInput, out var parsedAmount) ? parsedAmount : 0;
             if (amount <= 0)
             {
                 Console.WriteLine("Invalid amount. Please enter a positive number.");
                 return;
             }
 
-            var user = FindOrCreateUserJson(newUser);
+            var user = await FindOrCreateUserJsonAsync(newUser);
             var lastTransaction = user.TransactionHistories.Last();
             var newBalance = lastTransaction.Amount + amount;
 
@@ -89,158 +91,147 @@ namespace FinalProject
                 AmountEUR = lastTransaction.AmountEUR,
                 TransactionType = "Deposit"
             };
+
             user.TransactionHistories.Add(newTransaction);
-            SaveNewUser(user);
+            await SaveNewUserAsync(user);
+
             Console.WriteLine($"Successfully deposited {amount} GEL.");
             Console.WriteLine($"New balance is: {newBalance} GEL");
 
-            TriggerTransactionEvent($"User deposited {amount}. New balance is: {newBalance} GEL");
+            await TriggerTransactionEventAsync($"User deposited {amount}. New balance is: {newBalance} GEL");
         }
 
-        public static void getLastFiveTransactions(User newUser)
+        public static async Task GetLastFiveTransactionsAsync(User newUser)
         {
-            var user = FindOrCreateUserJson(newUser);
-            var lastSixTransactions = user.TransactionHistories
+            var user = await FindOrCreateUserJsonAsync(newUser);
+            var transactions = user.TransactionHistories
                 .OrderByDescending(t => t.TransactionDate)
                 .Take(6)
                 .ToList();
 
-            if (lastSixTransactions.Count == 0)
+            if (transactions.Count == 0)
             {
                 Console.WriteLine("No transactions found.");
                 return;
             }
+
             Console.WriteLine("Last 5 transactions:");
 
-            var maxCount = Math.Min(lastSixTransactions.Count, 6);
-
-            for (int i = 0; i < maxCount; i++)
+            for (int i = 0; i < transactions.Count - 1; i++)
             {
-                var transaction = lastSixTransactions.ElementAt(i);
-          
-                var previousTransaction = lastSixTransactions.ElementAtOrDefault(i + 1);
+                var transaction = transactions[i];
+                var previous = transactions.ElementAtOrDefault(i + 1);
 
-                if(transaction.TransactionType.Contains("Conversion") && previousTransaction != null)
+                if (transaction.TransactionType.Contains("Conversion") && previous != null)
                 {
-                   
-                    var prevGEL = previousTransaction.Amount;
-                    var currGEL = transaction.Amount;
-                    var gelChangeConv = prevGEL - currGEL;
+                    var gelChange = previous.Amount - transaction.Amount;
+                    var currency = transaction.TransactionType.Contains("USD") ? "USD" : "EUR";
+                    var change = currency == "USD"
+                        ? transaction.AmountUSD - previous.AmountUSD
+                        : transaction.AmountEUR - previous.AmountEUR;
 
-                    var otherCurrencyAmount = transaction.TransactionType.Contains("USD") ? transaction.AmountUSD : transaction.AmountEUR;
-                    var prevOtherCurrencyAmount = previousTransaction.TransactionType.Contains("USD") ? previousTransaction.AmountUSD : previousTransaction.AmountEUR;
-                    var otherCurrencyChange = otherCurrencyAmount - prevOtherCurrencyAmount;
-
-                    Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} {gelChangeConv} GEL converted to {otherCurrencyChange}");
-                    continue;
-                }
-
-                decimal gelChange;
-
-                if (previousTransaction != null && (transaction.TransactionType == "Deposit" || transaction.TransactionType == "Withdraw"))
-                {
-                    gelChange = previousTransaction.Amount - transaction.Amount;
-    
+                    Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} {gelChange} GEL converted to {change} {currency}");
                 }
                 else
                 {
-                    gelChange = transaction.Amount;
-                }
+                    var gelChange = previous != null
+                        ? previous.Amount - transaction.Amount
+                        : transaction.Amount;
 
-                Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} of {Math.Abs(gelChange)} GEL");
+                    Console.WriteLine($"{transaction.TransactionDate}: {transaction.TransactionType} of {Math.Abs(gelChange)} GEL");
+                }
             }
 
-            TriggerTransactionEvent($"User checked last 5 transactions");
+            await TriggerTransactionEventAsync("User checked last 5 transactions.");
         }
 
-        public static void ChangePin(User newUser)
+        public static async Task ChangePinAsync(User newUser)
         {
-            var user = FindOrCreateUserJson(newUser);
+            var user = await FindOrCreateUserJsonAsync(newUser);
+
             Console.Write("Enter your current PIN: ");
             var currentPin = Console.ReadLine() ?? string.Empty;
+
             if (currentPin != user.Pin)
             {
                 Console.WriteLine("Incorrect PIN.");
                 return;
             }
+
             Console.Write("Enter your new 4-digit PIN: ");
             var newPin = Console.ReadLine() ?? string.Empty;
+
             if (newPin.Length != 4 || !int.TryParse(newPin, out _))
             {
                 Console.WriteLine("Invalid PIN. It must be 4 digits.");
                 return;
             }
-            user.Pin = newPin;
-            SaveNewUser(user);
-            Console.WriteLine("PIN successfully changed.");
 
-            TriggerTransactionEvent($"User changed pin");
+            user.Pin = newPin;
+            await SaveNewUserAsync(user);
+
+            Console.WriteLine("PIN successfully changed.");
+            await TriggerTransactionEventAsync("User changed PIN.");
         }
 
-        public static void MoneyConversion(User newUser)
+        public static async Task MoneyConversionAsync(User newUser)
         {
-            var user = FindOrCreateUserJson(newUser);
-            var lastTransaction = user.TransactionHistories.Last();
             Console.WriteLine("Choose currency to convert to:");
             Console.WriteLine("1. USD");
             Console.WriteLine("2. EUR");
             Console.Write("Select an option (1-2): ");
             var choice = Console.ReadLine() ?? string.Empty;
+
             switch (choice)
             {
                 case "1":
-                    convertAmount(newUser, "USD");
+                    await ConvertAmountAsync(newUser, "USD");
                     break;
                 case "2":
-                    convertAmount(newUser, "EUR");
+                    await ConvertAmountAsync(newUser, "EUR");
                     break;
                 default:
                     Console.WriteLine("Invalid choice.");
                     break;
             }
 
-            TriggerTransactionEvent($"User converted money");
+            await TriggerTransactionEventAsync("User converted money.");
         }
 
-        public static User FindOrCreateUserJson(User newUser)
+        public static async Task<User> FindOrCreateUserJsonAsync(User newUser)
         {
             try
             {
-                var jsonString = File.ReadAllText("user.json");
-                var user = JsonSerializer.Deserialize<User>(jsonString);
-
-                if(user == null || user.CardNumber != newUser.CardNumber)
+                if (File.Exists("user.json"))
                 {
-                    return SaveNewUser(newUser); 
+                    var jsonString = await File.ReadAllTextAsync("user.json");
+                    var user = JsonSerializer.Deserialize<User>(jsonString);
+                    if (user != null && user.CardNumber == newUser.CardNumber)
+                        return user;
                 }
 
-                return user;
+                return await SaveNewUserAsync(newUser);
             }
-            catch (FileNotFoundException)
+            catch (Exception ex)
             {
-                return SaveNewUser(newUser);
-            }
-            catch (Exception e)
-            {
-                TriggerTransactionEvent(e.Message, "error");
-                return SaveNewUser(newUser);
+                await TriggerTransactionEventAsync(ex.Message, "error");
+                return await SaveNewUserAsync(newUser);
             }
         }
 
-        public static User SaveNewUser(User newUser)
+        public static async Task<User> SaveNewUserAsync(User newUser)
         {
-            var jsonString = JsonSerializer.Serialize(newUser);
-            File.WriteAllText("user.json", jsonString);
-            var user = JsonSerializer.Deserialize<User>(jsonString);
-
-            return user!;
+            var jsonString = JsonSerializer.Serialize(newUser, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync("user.json", jsonString);
+            return newUser;
         }
 
-        private static void convertAmount(User newUser ,string currency = "USD")
+        private static async Task ConvertAmountAsync(User newUser, string currency = "USD")
         {
             Console.Write("Enter amount in GEL to convert: ");
             var input = Console.ReadLine() ?? string.Empty;
-            var amount = decimal.TryParse(input, out decimal parsedAmount) ? parsedAmount : 0;
+            var amount = decimal.TryParse(input, out var parsedAmount) ? parsedAmount : 0;
+
             var lastTransaction = newUser.TransactionHistories.Last();
 
             if (amount <= 0)
@@ -248,43 +239,47 @@ namespace FinalProject
                 Console.WriteLine("Invalid amount. Please enter a positive number.");
                 return;
             }
-
             if (amount > lastTransaction.Amount)
             {
-                Console.WriteLine("Not enought funds");
+                Console.WriteLine("Not enough funds.");
                 return;
             }
 
             var rate = currency.ToUpper() == "EUR" ? EURConversion : USDConversion;
-            var quantity = amount / rate;
-            Console.WriteLine($"Succesfully converted in {currency}: {quantity} {currency}");
+            var converted = amount / rate;
 
+            Console.WriteLine($"Successfully converted to {currency}: {converted} {currency}");
 
             var newTransaction = new TransactionHistory
             {
                 TransactionDate = DateTime.Now,
                 Amount = lastTransaction.Amount - amount,
-                AmountUSD = currency == "USD"  ?lastTransaction.AmountUSD + quantity : lastTransaction.AmountUSD,
-                AmountEUR = currency == "EUR" ? lastTransaction.AmountEUR + quantity : lastTransaction.AmountEUR,
+                AmountUSD = currency == "USD" ? lastTransaction.AmountUSD + converted : lastTransaction.AmountUSD,
+                AmountEUR = currency == "EUR" ? lastTransaction.AmountEUR + converted : lastTransaction.AmountEUR,
                 TransactionType = $"Conversion to {currency}"
             };
 
             newUser.TransactionHistories.Add(newTransaction);
-
-            SaveNewUser(newUser);
-
-            TriggerTransactionEvent($"User converted {amount} GEL to {currency}");
+            await SaveNewUserAsync(newUser);
+            await TriggerTransactionEventAsync($"User converted {amount} GEL to {currency}");
         }
 
-        public static void TriggerTransactionEvent(string message, string type = "transaction")
+        public static async Task TriggerTransactionEventAsync(string message, string type = "transaction")
         {
-            OnTransaction?.Invoke(message, type);
+            if (OnTransaction != null)
+            {
+                var invocationList = OnTransaction.GetInvocationList();
+                foreach (TransactionDelegate handler in invocationList)
+                {
+                    await handler.Invoke(message, type);
+                }
+            }
         }
 
         public static void ListenToEvents()
         {
             var logger = new Logger();
-            OnTransaction += logger.Log;
+            OnTransaction += logger.LogAsync;
         }
     }
 }
